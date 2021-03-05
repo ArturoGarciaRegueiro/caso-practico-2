@@ -1,0 +1,28 @@
+- name: kubernetes master configuration
+  hosts: workers
+  remote_user: adminUsername
+
+  tasks:  
+  - name: Add ip to firewall
+    ansible.posix.firewalld:
+      port: "{{ item }}"
+      permanent: yes
+      zone: public
+      state: enabled
+    loop:
+      - 10250/tcp
+      - 30000-32767/tcp 
+    become: yes
+    become_method: sudo 
+
+  - name: Reload firewall
+    shell: |
+      firewall-cmd --reload
+    become: yes
+    become_method: sudo 
+
+  - name: join cluster "{{ join_command.stdout }}"
+    shell: |
+      eval {{ join_command.stdout }}
+    become: yes
+    become_method: sudo  

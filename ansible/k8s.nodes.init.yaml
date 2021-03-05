@@ -1,0 +1,4 @@
+- import_playbook: k8s.node.common.yaml
+- import_playbook: k8s.node.master.yaml
+- import_playbook: k8s.node.workers.yaml
+- import_playbook: k8s.ingress_controller.yaml

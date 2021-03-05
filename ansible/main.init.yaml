@@ -1,0 +1,45 @@
+- name: Common tasks
+  hosts: all
+  remote_user: adminUsername
+
+  tasks: 
+  - name: set timezone to Europe/Madrid"
+    timezone:
+      name: Europe/Madrid
+    become: yes
+    become_method: sudo 
+
+  - name: Install the latest version chrony
+    dnf:
+      name: chrony
+      state: latest
+    become: yes
+    become_method: sudo 
+
+  - name: Enable service chrony and ensure it is not masked
+    ansible.builtin.systemd:
+      name: chronyd
+      state: started
+      enabled: yes  
+
+  - name: Enable ntp
+    command: timedatectl set-ntp true
+  
+  - name: Disable SELinux (Kubernetes doesn't use it)
+    ansible.builtin.replace:
+      path: /etc/selinux/config
+      regexp: s/=enforcing/=disabled/g
+      replace: /etc/selinux/config
+    become: yes
+    become_method: sudo 
+
+  - name: Install
+    dnf:
+      name:
+        - nfs-utils
+        - nfs4-acl-tools
+        - wget
+      state: latest
+    become: yes
+    become_method: sudo 
+

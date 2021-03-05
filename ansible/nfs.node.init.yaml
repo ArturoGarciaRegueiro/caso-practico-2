@@ -1,0 +1,117 @@
+- name: Nfs node task
+  hosts: nfs
+  remote_user: adminUsername
+
+  tasks: 
+  - name: create volume
+    community.general.lvg:
+      vg: data_vg
+      pvs: /dev/sdc 
+    become: yes
+    become_method: sudo 
+  
+  - name: configure logical volume
+    community.general.lvol:
+      vg: data_vg
+      lv: nfs_lv
+      size: '2559'
+    become: yes
+    become_method: sudo 
+
+  - name: Create a ext2 filesystem on /dev/sdb1
+    filesystem:
+      fstype: xfs
+      dev: /dev/data_vg/nfs_lv 
+    become: yes
+    become_method: sudo 
+
+  - name: Create a ext2 filesystem on /dev/sdb1
+    filesystem:
+      fstype: xfs
+      dev: /dev/data_vg/nfs_lv 
+    become: yes
+    become_method: sudo 
+
+  - name: create nfs directory in /srv/nfs
+    file:
+      path: /srv/nfs
+      owner: root
+      group: root
+      state: directory
+    become: yes
+    become_method: sudo 
+
+  - name: Write backup script for each app
+    shell: |
+      echo '/dev/data_vg/nfs_lv        /srv/nfs                xfs     defaults        0 0' >> /etc/fstab
+    become: yes
+    become_method: sudo 
+
+  - name: mount all
+    command: mount -a
+    args:
+      warn: no
+    become: true
+
+  - name: Install
+    dnf:
+      name:
+        - nfs-utils
+        - net-tools 
+      state: latest
+    become: yes
+    become_method: sudo 
+  
+  - name: Enable and start nfs server
+    ansible.builtin.systemd:
+      name: nfs-server
+      state: started
+      enabled: yes  
+    become: yes
+    become_method: sudo 
+
+  - name: Write backup script for each app
+    shell: |
+      echo '/srv/nfs  192.168.1.10(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,root_squash,no_all_squash)' >> /etc/exports
+      echo '/srv/nfs  192.168.1.12(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,root_squash,no_all_squash)' >> /etc/exports
+      echo '/srv/nfs  192.168.1.13(sync,wdelay,hide,no_subtree_check,sec=sys,rw,secure,root_squash,no_all_squash)' >> /etc/exports
+    become: yes
+    become_method: sudo 
+  
+  - name: Enable and start firewall
+    ansible.builtin.systemd:
+      name: firewalld
+      state: started
+      enabled: yes  
+    become: yes
+    become_method: sudo   
+
+  - name: add nfs service to firewall
+    ansible.posix.firewalld:
+      service: 'nfs'
+      permanent: yes
+      state: enabled 
+    become: yes
+    become_method: sudo 
+
+  - name: add rpc-bind service to firewall
+    ansible.posix.firewalld:
+      service: rpc-bind
+      permanent: yes
+      state: enabled 
+    become: yes
+    become_method: sudo 
+
+  - name: add nfs mountd service to firewall
+    ansible.posix.firewalld:
+      service: 'mountd'
+      permanent: yes
+      state: enabled 
+    become: yes
+    become_method: sudo 
+    
+  - name: Reload firewall
+    shell: |
+      firewall-cmd --reload
+    become: yes
+    become_method: sudo 

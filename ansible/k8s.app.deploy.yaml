@@ -1,0 +1,20 @@
+- name: kubernetes master configuration
+  hosts: master
+  remote_user: adminUsername
+
+  tasks:  
+  - name: Copy app config yaml to vm
+    copy:
+      src: ./app/first-app.yaml
+      dest: /etc/first-app.yaml
+      owner: adminUsername
+      group: adminUsername
+      mode: 0777
+    become: yes
+    become_method: sudo 
+
+  - name: Deploy
+    shell: | 
+      kubectl apply -f /etc/first-app.yaml
+    become: yes
+    become_method: sudo 

@@ -1,0 +1,121 @@
+- name: workers+master nodes
+  hosts: master,workers
+  remote_user: adminUsername
+
+  tasks:
+  - name: Add ip to hosts
+    ansible.builtin.lineinfile:
+      path: /etc/hosts
+      line: 192.168.1.10 master master.acme.es
+    become: yes
+    become_method: sudo 
+    
+  - name: Add ip to hosts
+    ansible.builtin.lineinfile:
+      path: /etc/hosts
+      line: 192.168.1.12 worker01 worker01.acme.es
+    become: yes
+    become_method: sudo 
+
+  - name: Add ip to hosts
+    ansible.builtin.lineinfile:
+      path: /etc/hosts
+      line: 192.168.1.13 worker02 worker02.acme.es
+    become: yes
+    become_method: sudo 
+
+  - name: Add ip to hosts
+    ansible.builtin.lineinfile:
+      path: /etc/hosts
+      line: 192.168.1.11 nfs nfs.acme.es
+    become: yes
+    become_method: sudo 
+
+  - name: Configure kernel module
+    community.general.modprobe:
+      name: br_netfilter
+      state: present
+    become: yes
+    become_method: sudo 
+
+  - name: Enable and start firewall
+    ansible.builtin.systemd:
+      name: firewalld
+      state: started
+      enabled: yes  
+    become: yes
+    become_method: sudo   
+
+  - name: Enable and start firewall
+    ansible.posix.firewalld:
+      permanent: yes
+      masquerade: yes
+      state: enabled 
+    become: yes
+    become_method: sudo 
+
+  - name: Reload firewall
+    shell: |
+      firewall-cmd --reload
+    become: yes
+    become_method: sudo 
+
+  - name: Create k8s.conf file
+    ansible.builtin.file:
+      path: /etc/sysctl.d/k8s.conf
+      state: touch
+      mode: u=rw,g=r,o=r
+    become: yes
+    become_method: sudo 
+
+  - name: Write k8s.conf
+    shell: | 
+      echo 'net.bridge.bridge-nf-call-ip6tables = 1' >> /etc/sysctl.d/k8s.conf
+      echo 'net.bridge.bridge-nf-call-iptables = 1' >> /etc/sysctl.d/k8s.conf
+      systemctl --system
+      swapoff  -a
+      sed -i '/swap/d' /etc/fstab
+      dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+      dnf install docker-ce-19.03.14-3.el8 containerd.io -y
+    become: yes
+    become_method: sudo 
+
+  - name: Enable docker
+    ansible.builtin.systemd:
+      name: docker
+      state: started
+      enabled: yes  
+    become: yes
+    become_method: sudo 
+
+
+  - name: Create kubernetes.repo file
+    ansible.builtin.file:
+      path: /etc/yum.repos.d/kubernetes.repo
+      state: touch
+      mode: u=rw,g=r,o=r
+    become: yes
+    become_method: sudo 
+
+  - name: Write kubernetes.repo file
+    shell: | 
+      echo '[kubernetes]' >> /etc/yum.repos.d/kubernetes.repo
+      echo 'name=Kubernetes' >> /etc/yum.repos.d/kubernetes.repo
+      echo 'baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64' >> /etc/yum.repos.d/kubernetes.repo
+      echo 'enabled=1' >> /etc/yum.repos.d/kubernetes.repo
+      echo 'gpgcheck=1' >> /etc/yum.repos.d/kubernetes.repo
+      echo 'repo_gpgcheck=1' >> /etc/yum.repos.d/kubernetes.repo
+      echo 'gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg' >> /etc/yum.repos.d/kubernetes.repo
+      echo 'exclude=kubelet kubeadm kubectl' >> /etc/yum.repos.d/kubernetes.repo 
+      dnf install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+    become: yes
+    become_method: sudo 
+   
+  - name: Enable and start kubelet server
+    ansible.builtin.systemd:
+      name: kubelet
+      state: started
+      enabled: yes  
+    become: yes
+    become_method: sudo 
+  

@@ -1,0 +1,93 @@
+- name: kubernetes master configuration
+  hosts: master
+  remote_user: adminUsername
+
+  tasks: 
+  - name: Add ip to firewall
+    ansible.posix.firewalld:
+      port: "{{ item }}"
+      permanent: yes
+      state: enabled
+    loop:
+      - 6443/tcp
+      - 2379-2380/tcp
+      - 10250/tcp
+      - 10251/tcp
+      - 10252/tcp
+      - 10255/tcp
+    become: yes
+    become_method: sudo 
+  
+  - name: Pull config images
+    shell: |
+      kubeadm config images pull
+    become: yes
+    become_method: sudo 
+  
+  - name: Allow access from workers
+    ansible.posix.firewalld:
+      rich_rule: "{{ item }}"
+      permanent: yes
+      state: enabled
+    loop:
+      - rule family=ipv4 source address=192.168.1.12/32 accept
+      - rule family=ipv4 source address=192.168.1.13/32 accept 
+    become: yes
+    become_method: sudo 
+
+  - name: Reload firewall
+    shell: |
+      firewall-cmd --reload
+    become: yes
+    become_method: sudo 
+
+  - name: Add rule for 172.17.0.0
+    ansible.posix.firewalld:
+      rich_rule: rule family=ipv4 source address=172.17.0.0/16 accept
+      permanent: yes
+      state: enabled
+      zone: public
+    become: yes
+    become_method: sudo 
+    
+  - name: Reload firewall
+    shell: |
+      firewall-cmd --reload 
+    become: yes
+    become_method: sudo 
+
+  - name: Init kube
+    shell: |
+      sudo kubeadm init --pod-network-cidr 192.168.0.0/16 | grep 'kubeadm join\|--discovery-token-ca-cert-hash' > temp.txt
+    become: yes
+    become_method: sudo  
+
+  - name: generamos un valor aleatorio como salt para generar la contraseña
+    command: cat temp.txt
+    register: join_command 
+    become: yes
+    become_method: sudo 
+
+  - name: create directory in /root/.kube prev join_command "{{ join_command.stdout }}"
+    file:
+      path: /root/.kube
+      owner: root
+      group: root
+      state: directory
+    become: yes
+    become_method: sudo 
+
+  - name: Prepare .kube/config file
+    shell: | 
+      cp -i /etc/kubernetes/admin.conf /root/.kube/config
+      chown $(id -u):$(id -g) /root/.kube/config 
+    become: yes
+    become_method: sudo 
+
+  - name: Donload custom-resources.yaml and install tigera
+    shell: | 
+      wget https://docs.projectcalico.org/manifests/custom-resources.yaml
+      kubectl create -f https://docs.projectcalico.org/manifests/tigera-operator.yaml
+      kubectl apply -f custom-resources.yaml
+    become: yes
+    become_method: sudo 
